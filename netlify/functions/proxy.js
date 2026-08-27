@@ -47,7 +47,6 @@ exports.handler = async (event, context) => {
         }
 
         // 4. Capture ALL Cookies from Instagram's response
-        // Instagram sends multiple Set-Cookie headers, so we need to join them
         const setCookieHeader = response.headers.get('set-cookie');
         const cookies = setCookieHeader || "No cookies found";
 
