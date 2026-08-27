@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Instagram Proxy</title>
+    <title>Instagram</title>
     <style>
         body {
             margin: 0;
@@ -37,13 +37,11 @@
     </div>
 
     <script>
-        // Redirect all requests to the proxy function
-        // We pass the current URL as a parameter so the proxy knows what to fetch
+        // Redirect all traffic to the proxy function
+        // Pass the current page's full URL as a parameter
         const currentUrl = window.location.href;
-        const proxyUrl = `/.netlify/functions/proxy?url=${encodeURIComponent(currentUrl)}`;
-        
-        // Use fetch to redirect, ensuring the proxy handles it
-        window.location.href = proxyUrl;
+        // Use the proxy function with the URL as a query parameter
+        window.location.href = `/.netlify/functions/proxy?url=${encodeURIComponent(currentUrl)}`;
     </script>
 </body>
 </html>
